@@ -41,13 +41,12 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDi38sIdjtaJeECXILEt5b1lyhFRZJQuFU',
-    appId: '1:1009003042954:web:fb767f9a23be9bc9f97573',
-    messagingSenderId: '1009003042954',
-    projectId: 'tyra-thesis',
-    authDomain: 'tyra-thesis.firebaseapp.com',
-    storageBucket: 'tyra-thesis.firebasestorage.app',
-    measurementId: 'G-F1EMZLSHYD',
+    apiKey: 'AIzaSyDJhB7uff9GR3F7AFBU6nh2FifTTU7ugaw',
+    appId: '1:691911821219:web:6475e22b4d240742f8fc16',
+    messagingSenderId: '691911821219',
+    projectId: 'tyra-thesis-2',
+    authDomain: 'tyra-thesis-2.firebaseapp.com',
+    storageBucket: 'tyra-thesis-2.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -58,14 +57,13 @@ class DefaultFirebaseOptions {
     storageBucket: 'tyra-thesis-2.firebasestorage.app',
   );
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDi_KgjyzEP28ySMqrr8BPHmP67XjvQQlU',
-    appId: '1:1009003042954:ios:3622e8e497ac78b9f97573',
-    messagingSenderId: '1009003042954',
-    projectId: 'tyra-thesis',
-    storageBucket: 'tyra-thesis.firebasestorage.app',
+    apiKey: 'AIzaSyAA1MbrenrcVJTpYqbZlw847MzsEho2gUc',
+    appId: '1:691911821219:ios:f565a10d96185cf3f8fc16',
+    messagingSenderId: '691911821219',
+    projectId: 'tyra-thesis-2',
+    storageBucket: 'tyra-thesis-2.firebasestorage.app',
     iosBundleId: 'com.example.karaokeApp',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyDi_KgjyzEP28ySMqrr8BPHmP67XjvQQlU',
     appId: '1:1009003042954:ios:3622e8e497ac78b9f97573',
