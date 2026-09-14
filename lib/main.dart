@@ -6,6 +6,7 @@ import 'package:karaoke_app/import.dart';
 import 'package:karaoke_app/notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized before calling native code
@@ -14,7 +15,9 @@ void main() async {
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  await NotificationService.init();
+  if (!kIsWeb) {
+    await NotificationService.init();
+  }
   await NotificationService.setupInitialNotification();
 
   if (debugNotification) {

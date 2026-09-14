@@ -5,12 +5,16 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   static Future<void> init() async {
+    if (kIsWeb) {
+      return;
+    }
     tz.initializeTimeZones();
 
     final TimezoneInfo currentTimeZone =
@@ -32,6 +36,9 @@ class NotificationService {
   }
 
   static Future<void> scheduleDailyReminder(TimeOfDay time) async {
+    if (kIsWeb) {
+      return;
+    }
     await _notificationsPlugin.cancelAll();
 
     final now = tz.TZDateTime.now(tz.local);
@@ -65,10 +72,16 @@ class NotificationService {
   }
 
   static Future<void> cancelAll() async {
+    if (kIsWeb) {
+      return;
+    }
     await _notificationsPlugin.cancelAll();
   }
 
   static Future<void> debugNotification() async {
+    if (kIsWeb) {
+      return;
+    }
     await _notificationsPlugin.show(
       999,
       'Debug Notification',
@@ -84,6 +97,9 @@ class NotificationService {
   }
 
   static Future<void> setupInitialNotification() async {
+    if (kIsWeb) {
+      return;
+    }
     await requestPermissions();
 
     final prefs = await SharedPreferences.getInstance();
@@ -101,6 +117,9 @@ class NotificationService {
   }
 
   static Future<void> requestPermissions() async {
+    if (kIsWeb) {
+      return;
+    }
     if (Platform.isIOS) {
       await _notificationsPlugin
           .resolvePlatformSpecificImplementation<

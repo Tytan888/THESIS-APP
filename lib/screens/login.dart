@@ -45,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
+      print(e);
       if (context.mounted) {
         String message = "Login failed.";
         if (e.code == 'user-not-found' ||
