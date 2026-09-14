@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "691911821219",
+    "project_id": "tyra-thesis-2",
+    "storage_bucket": "tyra-thesis-2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:691911821219:android:2f177cc555776addf8fc16",
+        "android_client_info": {
+          "package_name": "com.example.karaoke_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2mAxwbiO9p2s5dUNJ0pcLQurWXGMpODk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:691911821219:android:149e9a5230dee0a3f8fc16",
+        "android_client_info": {
+          "package_name": "com.tylertan.koeru"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2mAxwbiO9p2s5dUNJ0pcLQurWXGMpODk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
