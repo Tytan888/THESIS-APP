@@ -25,7 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // 1. Format the dummy email
-      String dummyEmail = '${username.toLowerCase()}@koe.ru';
+      String dummyEmail = '${username.toLowerCase()}@example.com';
 
       // 2. Authenticate with Firebase
       await FirebaseAuth.instance.signInWithEmailAndPassword(

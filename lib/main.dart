@@ -6,6 +6,8 @@ import 'package:karaoke_app/import.dart';
 import 'package:karaoke_app/notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized before calling native code
@@ -14,14 +16,20 @@ void main() async {
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  await NotificationService.init();
-  await NotificationService.setupInitialNotification();
+  if (!kIsWeb) {
+    await NotificationService.init();
+    await NotificationService.setupInitialNotification();
 
-  if (debugNotification) {
-    await NotificationService.debugNotification();
+    if (debugNotification) {
+      await NotificationService.debugNotification();
+    }
   }
 
-  runApp(const KaraokeApp());
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((
+    _,
+  ) {
+    runApp(const KaraokeApp());
+  });
 }
 
 class KaraokeApp extends StatefulWidget {
@@ -76,13 +84,17 @@ class _KaraokeAppState extends State<KaraokeApp> {
         primarySwatch: Colors.blue,
         fontFamily: 'NotoSonsJP',
       ),
-      
+
       builder: (context, child) {
         return StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('config').doc('app_status').snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection('config')
+              .doc('app_status')
+              .snapshots(),
           builder: (context, snapshot) {
             bool isUnderMaintenance = false;
-            String maintenanceMsg = 'Koe.ru is currently undergoing emergency maintenance. Please check back soon!';
+            String maintenanceMsg =
+                'Koe.ru is currently undergoing emergency maintenance. Please check back soon!';
 
             if (snapshot.hasData && snapshot.data!.exists) {
               final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
@@ -95,7 +107,7 @@ class _KaraokeAppState extends State<KaraokeApp> {
               children: [
                 // 1. The active app and its Navigator stay mounted
                 child ?? const SizedBox(),
-                
+
                 // 2. The Maintenance Screen completely covers it and blocks interaction
                 if (isUnderMaintenance)
                   Positioned.fill(
