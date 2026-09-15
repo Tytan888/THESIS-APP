@@ -29,6 +29,7 @@ class KaraokePlayerScreen extends StatefulWidget {
 class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
     with WidgetsBindingObserver {
   late YoutubePlayerController _controller;
+  final GlobalKey _youtubeKey = GlobalKey();
 
   List<SubtitleLine> _subtitles = [];
   List<SubtitleLine> _visibleSubtitles = [];
@@ -131,8 +132,9 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
+    // Removed the 'inactive' check to prevent iframe focus from killing the video
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
       _controller.pauseVideo();
 
       accumulatedMs += DateTime.now()
@@ -208,6 +210,9 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
     _syncTimer = Timer.periodic(const Duration(milliseconds: 100), (
       timer,
     ) async {
+      final state = await _controller.playerState;
+      if (state != PlayerState.playing) return;
+
       int currentRequestId = ++_syncRequestId;
 
       try {
@@ -262,6 +267,9 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final videoHeight = screenWidth / (16 / 9);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
@@ -310,7 +318,17 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
         ),
         body: Column(
           children: [
-            YoutubePlayer(controller: _controller, aspectRatio: 16 / 9),
+            SizedBox(
+              key:
+                  _youtubeKey, // Locks the video in place to prevent the layout crash
+              width: screenWidth,
+              height: videoHeight,
+              child: IgnorePointer(
+                ignoring:
+                    false, // Ensures the browser feels your physical touch
+                child: YoutubePlayer(controller: _controller),
+              ),
+            ),
 
             Expanded(
               child: Container(
@@ -371,7 +389,9 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
                             batch.set(telemetryRef, {
                               'karaoke_end_time': DateTime.now(),
                               'karaoke_dwell_time_ms': accumulatedMs,
-                              'karaoke_type': groupId == g2 ? "Regular" : "Augmented",
+                              'karaoke_type': groupId == g2
+                                  ? "Regular"
+                                  : "Augmented",
                             }, SetOptions(merge: true));
 
                             batch.set(playlistSongRef, {

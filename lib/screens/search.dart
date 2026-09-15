@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart'; // Provides kIsWeb and kDebugMode
 import 'package:flutter/material.dart';
 import 'package:dart_ytmusic_api/yt_music.dart';
-import 'dart:async';
+import 'package:http/http.dart' as http;
 
 import 'package:karaoke_app/import.dart';
 
@@ -31,6 +34,21 @@ class SongResult {
   });
 }
 
+// Helper class to unify results between web (JSON) and native (YTMusic model)
+class _RawSongItem {
+  final String videoId;
+  final String name;
+  final String artistName;
+  final int duration;
+
+  _RawSongItem({
+    required this.videoId,
+    required this.name,
+    required this.artistName,
+    required this.duration,
+  });
+}
+
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -49,6 +67,13 @@ class _SearchScreenState extends State<SearchScreen> {
   final Map<String, StreamSubscription> _songSubscriptions = {};
   final Map<String, StreamSubscription> _progressSubscriptions = {};
 
+  // Replace with your actual deployed URL
+  static const String _prodFunctionUrl =
+      'https://search-songs-jf3iz2l54a-uc.a.run.app/searchSongs';
+  static const String _localFunctionUrl =
+      'https://search-songs-jf3iz2l54a-uc.a.run.app/searchSongs';
+      //'http://127.0.0.1:5001/tyra-thesis-2/us-central1/searchSongs';
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +81,12 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _setupApi() async {
+    // If running on web, we do not need to initialize YTMusic locally
+    if (kIsWeb) {
+      setState(() => _isApiReady = true);
+      return;
+    }
+
     try {
       await _ytMusic.initialize();
       setState(() => _isApiReady = true);
@@ -88,15 +119,48 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      final results = await _ytMusic.searchSongs(query);
+      List<_RawSongItem> rawResults = [];
 
-      final limitedResults = results.take(10).toList();
-      if (limitedResults.isEmpty) {
+      if (kIsWeb) {
+        // --- Web workaround via Firebase Function ---
+        final baseUrl = kDebugMode ? _localFunctionUrl : _prodFunctionUrl;
+        final uri = Uri.parse('$baseUrl?q=${Uri.encodeComponent(query)}');
+
+        final response = await http.get(uri);
+        if (response.statusCode != 200) {
+          throw Exception("Backend search failed (${response.statusCode}): ${response.body}");
+        }
+
+        final Map<String, dynamic> jsonBody = jsonDecode(response.body);
+        final List<dynamic> songsJson = jsonBody['data'] ?? [];
+
+        rawResults = songsJson.map((item) {
+          return _RawSongItem(
+            videoId: item['videoId'] ?? '',
+            name: item['title'] ?? '',
+            artistName: item['artist'] ?? '',
+            duration: item['duration'] ?? 0,
+          );
+        }).toList();
+      } else {
+        // --- Native direct search ---
+        final results = await _ytMusic.searchSongs(query);
+        rawResults = results.take(10).map((item) {
+          return _RawSongItem(
+            videoId: item.videoId,
+            name: item.name,
+            artistName: item.artist.name,
+            duration: item.duration ?? 0,
+          );
+        }).toList();
+      }
+
+      if (rawResults.isEmpty) {
         setState(() => _isSearching = false);
         return;
       }
 
-      List<String> videoIds = limitedResults.map((r) => r.videoId).toList();
+      List<String> videoIds = rawResults.map((r) => r.videoId).toList();
 
       final globalSongsSnapshot = await FirebaseFirestore.instance
           .collection('songs')
@@ -130,12 +194,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
       List<SongResult> newResults = [];
 
-      for (var item in limitedResults) {
+      for (var item in rawResults) {
         final String videoId = item.videoId;
         final String songName = item.name;
-        final String artistName = item.artist.name;
+        final String artistName = item.artistName;
 
-        final int songDurationInt = item.duration ?? 0;
+        final int songDurationInt = item.duration;
         final String songDuration =
             "${songDurationInt ~/ 60}:${(songDurationInt % 60).toString().padLeft(2, '0')}";
 
@@ -215,7 +279,6 @@ class _SearchScreenState extends State<SearchScreen> {
             final songData = songSnapshot.data() ?? {};
             final String statusStr = songData['status'] ?? '';
 
-            // Handle the 'completed' state asynchronously to check the playlist
             if (statusStr == 'completed') {
               final playlistDoc = await FirebaseFirestore.instance
                   .collection('users')
@@ -233,10 +296,9 @@ class _SearchScreenState extends State<SearchScreen> {
               });
 
               _progressSubscriptions[videoId]?.cancel();
-              return; // Exit early since we handled the state update above
+              return;
             }
 
-            // Handle all other states normally
             SongStatus currentStatus = SongStatus.needsProcessing;
             if (statusStr == 'error') {
               currentStatus = SongStatus.error;
