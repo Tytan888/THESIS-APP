@@ -43,8 +43,8 @@ class _PlaylistSongTile extends StatelessWidget {
         final videoId = snapshot.data!.id;
         final songData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
         final status = songData['status'] ?? '';
-        final title = songData['title'] ?? 'Unknown Title';
-        final artist = songData['artist'] ?? 'Unknown Artist';
+        final title = songData['title'] ?? 'Deleted Song';
+        final artist = songData['artist'] ?? '???';
         final thumbnailUrl = "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
 
         // IF PROCESSING: Nest a stream to listen to the subcollection progress document

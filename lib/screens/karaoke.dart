@@ -41,6 +41,7 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
 
   bool _isVideoFinished = false;
   bool _isLoadingMemory = true;
+  bool _wasAborted = false;
 
   DateTime? _lastBackedAt;
 
@@ -301,6 +302,9 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
                 setState(() {
                   _isVideoFinished = true;
                 });
+                setState(() {
+                  _wasAborted = true;
+                });
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(
@@ -392,6 +396,7 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
                               'karaoke_type': groupId == g2
                                   ? "Regular"
                                   : "Augmented",
+                              'karaoke_aborted': _wasAborted
                             }, SetOptions(merge: true));
 
                             batch.set(playlistSongRef, {

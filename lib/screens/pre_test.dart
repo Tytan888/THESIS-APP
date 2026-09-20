@@ -205,7 +205,7 @@ class _PreTestScreenState extends State<PreTestScreen>
     List<String> cleanForms = [];
     for (var form in rawForms) {
       final infoList = form['info'] as List<dynamic>? ?? [];
-      if (infoList.isEmpty) {
+      if (infoList.every((info) => info.toString().toLowerCase().contains('ateji'))) {
         cleanForms.add(form['text'].toString());
       }
     }

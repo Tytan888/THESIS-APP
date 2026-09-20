@@ -431,7 +431,6 @@ class _SearchScreenState extends State<SearchScreen> {
         'title': song.title,
         'artist': song.artist,
         'status': 'processing',
-        'requested_by': FieldValue.arrayUnion([currentUsername]),
       }, SetOptions(merge: true));
 
       batch.set(progressRef, {
@@ -449,6 +448,7 @@ class _SearchScreenState extends State<SearchScreen> {
         userRef,
         {
           'daily_requests': dailyRequests,
+          'requested': FieldValue.arrayUnion([song.id]),
         },
         SetOptions(merge: true),
       );

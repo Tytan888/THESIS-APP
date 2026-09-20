@@ -37,7 +37,7 @@ class _WordlistScreenState extends State<WordlistScreen>
   bool _isLoadingMemory = true;
   bool _isLoadingSubtitles = true; // NEW: Track subtitle loading
   DateTime? _lastBackedAt;
-  
+
   List<SubtitleLine> _subtitles = []; // NEW: Store the fetched lyrics
 
   @override
@@ -64,7 +64,7 @@ class _WordlistScreenState extends State<WordlistScreen>
           .collection('songs')
           .doc(widget.videoId)
           .get();
-          
+
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         final rawSubs = data['subtitles'] as List<dynamic>? ?? [];
@@ -164,7 +164,7 @@ class _WordlistScreenState extends State<WordlistScreen>
     List<String> cleanForms = [];
     for (var form in rawForms) {
       final infoList = form['info'] as List<dynamic>? ?? [];
-      if (infoList.isEmpty) {
+      if (infoList.every((info) => info.toString().toLowerCase().contains('ateji'))) {
         cleanForms.add(form['text'].toString());
       }
     }
@@ -219,7 +219,8 @@ class _WordlistScreenState extends State<WordlistScreen>
         'karaoke_end_time': null,
         'word_dwell_times_ms': activeDwellTimes,
         'karaoke_dwell_time_ms': null,
-        'karaoke_type': null
+        'karaoke_type': null,
+        'karaoke_aborted': null,
       });
 
       if (!mounted) return;
@@ -398,14 +399,18 @@ class _WordlistScreenState extends State<WordlistScreen>
 
                   // UPDATED: Extract line index from the appearing_in_songs map using the current videoId
                   SubtitleLine? contextLine;
-                  final appearingInSongs = word['appearing_in_songs'] as Map<String, dynamic>? ?? {};
-                  final firstSeen = appearingInSongs[widget.videoId] as String? ?? "";
-                  
+                  final appearingInSongs =
+                      word['appearing_in_songs'] as Map<String, dynamic>? ?? {};
+                  final firstSeen =
+                      appearingInSongs[widget.videoId] as String? ?? "";
+
                   if (firstSeen.isNotEmpty) {
                     final parts = firstSeen.split(':');
                     if (parts.isNotEmpty) {
                       final lineIndex = int.tryParse(parts[0]);
-                      if (lineIndex != null && lineIndex >= 0 && lineIndex < _subtitles.length) {
+                      if (lineIndex != null &&
+                          lineIndex >= 0 &&
+                          lineIndex < _subtitles.length) {
                         contextLine = _subtitles[lineIndex];
                       }
                     }
@@ -611,12 +616,15 @@ class _WordlistScreenState extends State<WordlistScreen>
                           ),
                           const SizedBox(height: 12),
                           Container(
-                            height: 160, // Fixed height prevents LayoutBuilder infinity crash
+                            height:
+                                160, // Fixed height prevents LayoutBuilder infinity crash
                             padding: const EdgeInsets.all(16.0),
                             decoration: BoxDecoration(
                               color: const Color(0xFF1E1E1E),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08),
+                              ),
                             ),
                             child: KaraokeLyricsDisplay(
                               subtitle: contextLine,
@@ -624,7 +632,7 @@ class _WordlistScreenState extends State<WordlistScreen>
                               reviewedUids: [word['uid'] as String],
                             ),
                           ),
-                        ]
+                        ],
                       ],
                     ),
                   );

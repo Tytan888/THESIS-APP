@@ -1,0 +1,4 @@
+# For Android (Make Sure to Increment Version Number)
+flutter build appbundle --release
+
+flutter

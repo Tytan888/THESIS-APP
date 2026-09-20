@@ -214,7 +214,7 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
     List<String> cleanForms = [];
     for (var form in rawForms) {
       final infoList = form['info'] as List<dynamic>? ?? [];
-      if (infoList.isEmpty) {
+      if (infoList.every((info) => info.toString().toLowerCase().contains('ateji'))) {
         cleanForms.add(form['text'].toString());
       }
     }
@@ -284,7 +284,7 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text("Post-Test (${_currentIndex + 1} / ${widget.unseenWords.length})"),
+          title: Text("Quick After-Review (${_currentIndex + 1} / ${widget.unseenWords.length})"),
           leading: _currentIndex > 0
               ? IconButton(
                   icon: const Icon(Icons.arrow_back),

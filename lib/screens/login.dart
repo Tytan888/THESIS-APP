@@ -16,7 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   Future<void> _handleLogin(BuildContext context) async {
-    String username = _usernameController.text.trim();
+    String username = _usernameController.text.trim().toLowerCase();
     String pin = _pinController.text.trim();
 
     if (username.isEmpty || pin.isEmpty) return;
