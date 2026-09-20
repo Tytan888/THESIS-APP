@@ -1,4 +1,5 @@
 # For Android (Make Sure to Increment Version Number)
 flutter build appbundle --release
 
-flutter
+# For Web (Push to Github After This)
+flutter build web --release
