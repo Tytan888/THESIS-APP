@@ -164,7 +164,9 @@ class _WordlistScreenState extends State<WordlistScreen>
     List<String> cleanForms = [];
     for (var form in rawForms) {
       final infoList = form['info'] as List<dynamic>? ?? [];
-      if (infoList.every((info) => info.toString().toLowerCase().contains('ateji'))) {
+      if (infoList.every(
+        (info) => info.toString().toLowerCase().contains('ateji'),
+      )) {
         cleanForms.add(form['text'].toString());
       }
     }
@@ -616,8 +618,8 @@ class _WordlistScreenState extends State<WordlistScreen>
                           ),
                           const SizedBox(height: 12),
                           Container(
-                            height:
-                                160, // Fixed height prevents LayoutBuilder infinity crash
+                            width: double.infinity, // Let it fill horizontally
+                            // REMOVE THE fixed height completely so it hugs the text!
                             padding: const EdgeInsets.all(16.0),
                             decoration: BoxDecoration(
                               color: const Color(0xFF1E1E1E),
@@ -628,8 +630,8 @@ class _WordlistScreenState extends State<WordlistScreen>
                             ),
                             child: KaraokeLyricsDisplay(
                               subtitle: contextLine,
-                              // Only pass THIS word's UID to uniquely highlight it
                               reviewedUids: [word['uid'] as String],
+                              isContextMode: true, // <--- ADD THIS
                             ),
                           ),
                         ],

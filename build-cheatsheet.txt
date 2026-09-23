@@ -2,4 +2,9 @@
 flutter build appbundle --release
 
 # For Web (Push to Github After This)
-flutter build web --release
+flutter build web --base-href "/koeru-web/"
+
+git init
+git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+git fetch origin
+git reset --mixed origin/main

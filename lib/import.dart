@@ -78,7 +78,9 @@ String kanaToRomaji(String kana) {
     } else if (normalizedKana[i] == 'っ' || normalizedKana[i] == 'ッ') {
       if (i + 1 < normalizedKana.length) {
         String nextChar = _kanaToRomajiMap[normalizedKana[i + 1]] ?? "";
-        if (nextChar.isNotEmpty) result += nextChar; 
+        if (nextChar.isNotEmpty) {
+          result += nextChar[0]; 
+        } 
       }
       i++;
     } else if (_kanaToRomajiMap.containsKey(normalizedKana[i])) {

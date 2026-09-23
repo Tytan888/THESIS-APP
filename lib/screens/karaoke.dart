@@ -179,23 +179,31 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
       final data = doc.data() as Map<String, dynamic>;
       final rawSubs = data['subtitles'] as List<dynamic>? ?? [];
 
-      List<SubtitleLine> parsedSubs = rawSubs.map((s) {
-        double safeParse(dynamic value) {
-          if (value == null) return 0.0;
-          if (value is num) return value.toDouble();
-          if (value is String) return double.tryParse(value) ?? 0.0;
-          return 0.0;
-        }
+      List<SubtitleLine> parsedSubs = rawSubs
+          .map((s) {
+            double safeParse(dynamic value) {
+              if (value == null) return 0.0;
+              if (value is num) return value.toDouble();
+              if (value is String) return double.tryParse(value) ?? 0.0;
+              return 0.0;
+            }
 
-        return SubtitleLine(
-          jp: s['jp']?.toString() ?? '',
-          en: s['en']?.toString() ?? '',
-          romaji: s['romaji']?.toString() ?? '',
-          alignments: s['alignments']?.toString() ?? '',
-          startTimeMs: (safeParse(s['start_time'])).toInt(),
-          endTimeMs: (safeParse(s['end_time'])).toInt(),
-        );
-      }).toList();
+            return SubtitleLine(
+              jp: s['jp']?.toString() ?? '',
+              en: s['en']?.toString() ?? '',
+              romaji: s['romaji']?.toString() ?? '',
+              alignments: s['alignments']?.toString() ?? '',
+              startTimeMs: (safeParse(s['start_time'])).toInt(),
+              endTimeMs: (safeParse(s['end_time'])).toInt(),
+            );
+          })
+          .where(
+            (sub) =>
+                sub.jp.trim().isNotEmpty ||
+                sub.romaji.trim().isNotEmpty ||
+                sub.en.trim().isNotEmpty,
+          )
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -396,7 +404,7 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
                               'karaoke_type': groupId == g2
                                   ? "Regular"
                                   : "Augmented",
-                              'karaoke_aborted': _wasAborted
+                              'karaoke_aborted': _wasAborted,
                             }, SetOptions(merge: true));
 
                             batch.set(playlistSongRef, {
@@ -528,7 +536,7 @@ class _DualSlotLyricsDisplayState extends State<DualSlotLyricsDisplay> {
 
         // Separator
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24.0),
+          padding: const EdgeInsets.symmetric(vertical: 12.0),
           child: Divider(
             color: Colors.white.withValues(alpha: 0.15),
             thickness: 1.5,
@@ -559,11 +567,13 @@ class _DualSlotLyricsDisplayState extends State<DualSlotLyricsDisplay> {
 class KaraokeLyricsDisplay extends StatelessWidget {
   final SubtitleLine? subtitle;
   final List<String> reviewedUids;
+  final bool isContextMode;
 
   const KaraokeLyricsDisplay({
     super.key,
     required this.subtitle,
     required this.reviewedUids,
+    this.isContextMode = false,
   });
 
   List<List<Set<int>>> _combineBidirectionalOverlaps(
@@ -573,18 +583,25 @@ class KaraokeLyricsDisplay extends StatelessWidget {
     Set<String> nodes = {};
 
     for (String a in rawAlignments) {
+      print(a);
       if (a.isEmpty) continue;
 
       // --- NEW: THE ALIGNMENT FILTER ---
       // Expected format: "0-1:123456"
       List<String> uidSplit = a.split(':');
       if (uidSplit.length != 2) continue;
+      print(a);
 
       String positions = uidSplit[0]; // "0-1"
       String uid = uidSplit[1]; // "123456"
 
+      print(positions);
+      print(uid);
+
+
       // Skip this alignment completely if the user hasn't studied it!
       if (!reviewedUids.contains(uid)) continue;
+      print(uid);
       // ---------------------------------
 
       List<String> parts = positions.split('-');
@@ -681,150 +698,277 @@ class KaraokeLyricsDisplay extends StatelessWidget {
       }
     }
 
-    Widget jpRoSection;
+    // Builds the lyric block at a given font scale. Called with a fixed
+    // scale of 1.0 in Wordlist context mode, and with a *dynamically
+    // shrinking* scale in Karaoke mode (see _ShrinkToFitLyrics below).
+    // Because the words are re-wrapped at this scale rather than the whole
+    // block being visually scaled down, every line keeps using the full
+    // available width no matter how small the font ends up.
+    Widget buildContent(double scale) {
+      Widget jpRoSection;
 
-    if (jpWords.length == roWords.length) {
-      List<Widget> wordPairs = [];
-      for (int i = 0; i < jpWords.length; i++) {
-        bool isKeyWord = jpColors.containsKey(i);
-        FontWeight dynamicWeight = isKeyWord
-            ? FontWeight.bold
-            : FontWeight.normal;
+      if (jpWords.length == roWords.length) {
+        List<Widget> wordPairs = [];
+        for (int i = 0; i < jpWords.length; i++) {
+          bool isKeyWord = jpColors.containsKey(i);
+          FontWeight dynamicWeight = isKeyWord
+              ? FontWeight.bold
+              : FontWeight.normal;
 
-        wordPairs.add(
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment:
-                CrossAxisAlignment.center, // Left-align stacked words
-            children: [
-              Text(
-                jpWords[i],
-                style: TextStyle(
-                  color: jpColors[i] ?? Colors.white,
-                  fontSize: 18,
-                  fontWeight: dynamicWeight,
-                  fontFamily: 'NotoSansJP',
-                  height: 1.2, // Added line height
+          wordPairs.add(
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  jpWords[i],
+                  style: TextStyle(
+                    color: jpColors[i] ?? Colors.white,
+                    fontSize: 18 * scale,
+                    fontWeight: dynamicWeight,
+                    fontFamily: 'NotoSansJP',
+                    height: 1.2,
+                  ),
                 ),
-              ),
-              Text(
-                roWords[i],
-                style: TextStyle(
-                  color: jpColors[i] ?? Colors.white,
-                  fontSize: 24,
-                  fontWeight: dynamicWeight,
-                  height: 1.2, // Added line height
+                Text(
+                  roWords[i],
+                  style: TextStyle(
+                    color: jpColors[i] ?? Colors.white,
+                    fontSize: 24 * scale,
+                    fontWeight: dynamicWeight,
+                    height: 1.2,
+                  ),
                 ),
+              ],
+            ),
+          );
+        }
+
+        jpRoSection = Wrap(
+          alignment: WrapAlignment.start,
+          crossAxisAlignment: WrapCrossAlignment.end,
+          spacing: 14.0 * scale,
+          runSpacing: 6.0 * scale,
+          children: wordPairs,
+        );
+      } else {
+        List<TextSpan> jpSpans = [];
+        List<TextSpan> roSpans = [];
+
+        for (int i = 0; i < jpWords.length; i++) {
+          bool isKeyWord = jpColors.containsKey(i);
+          jpSpans.add(
+            TextSpan(
+              text: '${jpWords[i]} ',
+              style: TextStyle(
+                color: jpColors[i] ?? Colors.white,
+                fontSize: 20 * scale,
+                fontWeight: isKeyWord ? FontWeight.bold : FontWeight.normal,
+                fontFamily: 'NotoSansJP',
+                height: 1.2,
               ),
-            ],
-          ),
+            ),
+          );
+        }
+
+        for (int i = 0; i < roWords.length; i++) {
+          bool isKeyWord = jpColors.containsKey(i);
+          roSpans.add(
+            TextSpan(
+              text: '${roWords[i]} ',
+              style: TextStyle(
+                color: jpColors[i] ?? Colors.white,
+                fontSize: 28 * scale,
+                fontWeight: isKeyWord ? FontWeight.bold : FontWeight.normal,
+                height: 1.2,
+              ),
+            ),
+          );
+        }
+
+        jpRoSection = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RichText(
+              textAlign: TextAlign.left,
+              text: TextSpan(children: jpSpans),
+            ),
+            const SizedBox(height: 2),
+            RichText(
+              textAlign: TextAlign.left,
+              text: TextSpan(children: roSpans),
+            ),
+          ],
         );
       }
 
-      jpRoSection = Wrap(
-        alignment: WrapAlignment.start, // Changed from center to left-aligned
-        crossAxisAlignment: WrapCrossAlignment.end,
-        spacing: 14.0, // Increased horizontal breathing room
-        runSpacing:
-            6.0, // Increased vertical breathing room between wrapped lines
-        children: wordPairs,
-      );
-    } else {
-      List<TextSpan> jpSpans = [];
-      List<TextSpan> roSpans = [];
-
-      for (int i = 0; i < jpWords.length; i++) {
-        bool isKeyWord = jpColors.containsKey(i);
-        jpSpans.add(
+      List<TextSpan> enSpans = [];
+      for (int i = 0; i < enWords.length; i++) {
+        bool isKeyWord = enColors.containsKey(i);
+        enSpans.add(
           TextSpan(
-            text: '${jpWords[i]} ',
+            text: '${enWords[i]} ',
             style: TextStyle(
-              color: jpColors[i] ?? Colors.white,
-              fontSize: 20,
+              color: enColors[i] ?? Colors.white70,
+              fontSize: 22 * scale,
               fontWeight: isKeyWord ? FontWeight.bold : FontWeight.normal,
-              fontFamily: 'NotoSansJP',
-              height: 1.2, // Added line height
+              height: 1.2,
             ),
           ),
         );
       }
 
-      for (int i = 0; i < roWords.length; i++) {
-        bool isKeyWord = jpColors.containsKey(i);
-        roSpans.add(
-          TextSpan(
-            text: '${roWords[i]} ',
-            style: TextStyle(
-              color: jpColors[i] ?? Colors.white,
-              fontSize: 28,
-              fontWeight: isKeyWord ? FontWeight.bold : FontWeight.normal,
-              height: 1.2, // Added line height
-            ),
-          ),
-        );
-      }
-
-      jpRoSection = Column(
+      return Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment:
-            CrossAxisAlignment.start, // Left-align RichText blocks
+        mainAxisAlignment: isContextMode
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          jpRoSection,
+          SizedBox(height: 20 * scale),
           RichText(
             textAlign: TextAlign.left,
-            text: TextSpan(children: jpSpans),
-          ),
-          const SizedBox(height: 2), // Replaced tight 4px spacing
-          RichText(
-            textAlign: TextAlign.left,
-            text: TextSpan(children: roSpans),
+            text: TextSpan(children: enSpans),
           ),
         ],
       );
     }
 
-    List<TextSpan> enSpans = [];
-    for (int i = 0; i < enWords.length; i++) {
-      bool isKeyWord = enColors.containsKey(i);
-      enSpans.add(
-        TextSpan(
-          text: '${enWords[i]} ',
-          style: TextStyle(
-            color: enColors[i] ?? Colors.white70,
-            fontSize: 22,
-            fontWeight: isKeyWord ? FontWeight.bold : FontWeight.normal,
-            height: 1.2, // Added line height
-          ),
-        ),
-      );
+    // If displayed in the Wordlist context, return content directly at
+    // standard size (wraps naturally, no shrinking needed).
+    if (isContextMode) {
+      return buildContent(1.0);
     }
 
+    // If displayed in the Karaoke Player: always wrap at the full
+    // available width, and only shrink the font scale (never a visual
+    // transform) if the wrapped text doesn't fit vertically. This keeps
+    // every line using the full width instead of shrinking in from the
+    // right whenever a line has a lot of words.
     return LayoutBuilder(
       builder: (context, constraints) {
-        return SizedBox(
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: constraints.maxWidth),
-
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  jpRoSection,
-                  const SizedBox(height: 20),
-                  RichText(
-                    textAlign: TextAlign.left,
-                    text: TextSpan(children: enSpans),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        return _ShrinkToFitLyrics(
+          maxWidth: constraints.maxWidth,
+          maxHeight: constraints.maxHeight,
+          measureKey: '${subtitle!.startTimeMs}_${subtitle!.jp}',
+          maxScale: 1.4,
+          minScale: 0.3,
+          builder: buildContent,
         );
       },
+    );
+  }
+}
+
+// Finds the largest font scale (between [minScale] and [maxScale]) at which
+// [builder]'s output, wrapped at [maxWidth], fits within [maxHeight] --
+// by re-measuring and re-wrapping at each candidate scale rather than
+// visually scaling the whole block. This is what keeps text using the
+// full width even when it has to shrink to fit vertically.
+class _ShrinkToFitLyrics extends StatefulWidget {
+  final double maxWidth;
+  final double maxHeight;
+  final double maxScale;
+  final double minScale;
+  final Widget Function(double scale) builder;
+  final Object measureKey;
+
+  const _ShrinkToFitLyrics({
+    required this.maxWidth,
+    required this.maxHeight,
+    required this.builder,
+    required this.measureKey,
+    this.maxScale = 1.4,
+    this.minScale = 0.7,
+  });
+
+  @override
+  State<_ShrinkToFitLyrics> createState() => _ShrinkToFitLyricsState();
+}
+
+class _ShrinkToFitLyricsState extends State<_ShrinkToFitLyrics> {
+  final GlobalKey _measureKey = GlobalKey();
+  double _scale = 0;
+  double _low = 0;
+  double _high = 0;
+  bool _settled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startMeasuring();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShrinkToFitLyrics old) {
+    super.didUpdateWidget(old);
+    if (old.measureKey != widget.measureKey ||
+        old.maxWidth != widget.maxWidth ||
+        old.maxHeight != widget.maxHeight) {
+      _startMeasuring();
+    }
+  }
+
+  void _startMeasuring() {
+    _low = widget.minScale;
+    _high = widget.maxScale;
+    _settled = false;
+    _scale = widget.maxScale;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _step());
+  }
+
+  void _step() {
+    if (!mounted) return;
+    final box = _measureKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+
+    final fits = box.size.height <= widget.maxHeight;
+
+    if ((_high - _low).abs() < 0.03) {
+      setState(() {
+        _scale = fits ? _scale : _low;
+        _settled = true;
+      });
+      return;
+    }
+
+    if (fits) {
+      _low = _scale;
+    } else {
+      _high = _scale;
+    }
+
+    setState(() => _scale = (_low + _high) / 2);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _step());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.maxWidth,
+      height: widget.maxHeight,
+      child: AnimatedOpacity(
+        opacity: _settled ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 150),
+        child: OverflowBox(
+          alignment: Alignment.centerLeft,
+          minWidth: 0,
+          maxWidth: widget.maxWidth,
+          minHeight: 0,
+          // Unbounded on purpose: this lets the child report its TRUE
+          // natural height so _step() can tell whether it actually fits,
+          // instead of having that height silently clamped to
+          // widget.maxHeight by the SizedBox above (which was the bug —
+          // it made `fits` always true and disabled shrinking entirely).
+          maxHeight: double.infinity,
+          child: KeyedSubtree(
+            key: _measureKey,
+            child: widget.builder(_scale),
+          ),
+        ),
+      ),
     );
   }
 }

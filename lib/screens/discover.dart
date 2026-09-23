@@ -29,32 +29,57 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           .doc(currentUsername)
           .collection('playlist')
           .get();
-          
+
       Set<String> userSongIds = playlistSnap.docs.map((doc) => doc.id).toSet();
 
-      // 2. Get community songs that have been successfully processed
-      final globalSongsSnap = await db
-          .collection('songs')
-          .where('status', isEqualTo: 'completed')
-          .limit(50) // Limit to prevent massive reads as the database grows
-          .get();
-
       List<SongResult> results = [];
+      DocumentSnapshot? lastDocument;
+      bool hasMore = true;
+      const targetDisplayCount =
+          20; // The number of new songs you want to show on the screen
 
-      for (var doc in globalSongsSnap.docs) {
-        // 3. Only add the song if the user doesn't already have it
-        if (!userSongIds.contains(doc.id)) {
-          final data = doc.data();
-          results.add(
-            SongResult(
-              id: doc.id,
-              title: data['title'] ?? 'Unknown Title',
-              artist: data['artist'] ?? 'Unknown Artist',
-              duration: '', // Duration isn't stored in Firebase, so we omit it
-              thumbnailUrl: "https://img.youtube.com/vi/${doc.id}/mqdefault.jpg",
-              status: SongStatus.readyToAdd,
-            ),
-          );
+      // 2. Loop until we find enough un-added songs, or run out of songs in the DB
+      while (results.length < targetDisplayCount && hasMore) {
+        var query = db
+            .collection('songs')
+            .where('status', isEqualTo: 'completed')
+            .limit(50);
+
+        if (lastDocument != null) {
+          query = query.startAfterDocument(lastDocument!);
+        }
+
+        final globalSongsSnap = await query.get();
+
+        if (globalSongsSnap.docs.isEmpty) {
+          hasMore = false; // No more songs left in the database
+          break;
+        }
+
+        // Save the cursor for the next potential batch
+        lastDocument = globalSongsSnap.docs.last;
+
+        for (var doc in globalSongsSnap.docs) {
+          // 3. Only add the song if the user doesn't already have it
+          if (!userSongIds.contains(doc.id)) {
+            final data = doc.data();
+            results.add(
+              SongResult(
+                id: doc.id,
+                title: data['title'] ?? 'Unknown Title',
+                artist: data['artist'] ?? 'Unknown Artist',
+                duration: '',
+                thumbnailUrl:
+                    "https://img.youtube.com/vi/${doc.id}/mqdefault.jpg",
+                status: SongStatus.readyToAdd,
+              ),
+            );
+
+            // Break early if this batch fulfilled our target
+            if (results.length >= targetDisplayCount) {
+              break;
+            }
+          }
         }
       }
 
@@ -67,9 +92,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error loading songs: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error loading songs: $e")));
       }
     }
   }
@@ -97,7 +122,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       );
     } else if (song.status == SongStatus.added) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("\"${song.title}\" is already in your playlist!")),
+        SnackBar(
+          content: Text("\"${song.title}\" is already in your playlist!"),
+        ),
       );
     }
   }
@@ -116,14 +143,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _discoverResults.isEmpty
-              ? const Center(child: Text("No new songs to discover yet!"))
-              : ListView.builder(
-                  itemCount: _discoverResults.length,
-                  itemBuilder: (context, index) {
-                    final song = _discoverResults[index];
-                    return _buildResultTile(song);
-                  },
-                ),
+          ? const Center(child: Text("No new songs to discover yet!"))
+          : ListView.builder(
+              itemCount: _discoverResults.length,
+              itemBuilder: (context, index) {
+                final song = _discoverResults[index];
+                return _buildResultTile(song);
+              },
+            ),
     );
   }
 
@@ -178,9 +205,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               height: 68,
               child: Padding(
                 padding: const EdgeInsets.only(left: 12.0),
-                child: Center(
-                  child: _buildStatusIcon(song.status),
-                ),
+                child: Center(child: _buildStatusIcon(song.status)),
               ),
             ),
           ],
