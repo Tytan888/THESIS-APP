@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:karaoke_app/import.dart';
 import 'package:karaoke_app/notifications.dart';
+import 'package:flutter/foundation.dart';
 
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
@@ -156,10 +157,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         centerTitle: true,
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: _showNotificationSettings,
-          ),
+          if (!kIsWeb)
+            IconButton(
+              icon: const Icon(Icons.notifications),
+              onPressed: _showNotificationSettings,
+            ),
         ],
       ),
       body: Padding(
@@ -200,7 +202,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 );
               },
             ),
-            
+
             const SizedBox(height: 20), // Space between buttons
             _buildMenuButton(
               context: context,
@@ -210,7 +212,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const DiscoverScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const DiscoverScreen(),
+                  ),
                 );
               },
             ),

@@ -39,14 +39,28 @@ class KaraokeApp extends StatefulWidget {
   State<KaraokeApp> createState() => _KaraokeAppState();
 }
 
-class _KaraokeAppState extends State<KaraokeApp> {
+class _KaraokeAppState extends State<KaraokeApp> with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _hasUsername = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkLoginStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!kIsWeb && state == AppLifecycleState.resumed) {
+      NotificationService.refreshSchedule();
+    }
   }
 
   Future<void> _checkLoginStatus() async {

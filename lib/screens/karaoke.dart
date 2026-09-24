@@ -583,25 +583,18 @@ class KaraokeLyricsDisplay extends StatelessWidget {
     Set<String> nodes = {};
 
     for (String a in rawAlignments) {
-      print(a);
       if (a.isEmpty) continue;
 
       // --- NEW: THE ALIGNMENT FILTER ---
       // Expected format: "0-1:123456"
       List<String> uidSplit = a.split(':');
       if (uidSplit.length != 2) continue;
-      print(a);
 
       String positions = uidSplit[0]; // "0-1"
       String uid = uidSplit[1]; // "123456"
 
-      print(positions);
-      print(uid);
-
-
       // Skip this alignment completely if the user hasn't studied it!
       if (!reviewedUids.contains(uid)) continue;
-      print(uid);
       // ---------------------------------
 
       List<String> parts = positions.split('-');
@@ -673,7 +666,7 @@ class KaraokeLyricsDisplay extends StatelessWidget {
     Map<int, Color> jpColors = {};
     Map<int, Color> enColors = {};
 
-    if (groupId != g2) {
+    if (groupId != g2 || isContextMode) {
       List<Color> highlightColors = [
         Colors.redAccent,
         Colors.lightBlueAccent,

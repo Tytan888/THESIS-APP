@@ -83,9 +83,12 @@ class NotificationService {
     );
   }
 
-  static Future<void> setupInitialNotification() async {
+    static Future<void> setupInitialNotification() async {
     await requestPermissions();
+    await refreshSchedule();
+  }
 
+  static Future<void> refreshSchedule() async {
     final prefs = await SharedPreferences.getInstance();
 
     bool isEnabled = prefs.getBool('notifications_enabled') ?? true;
