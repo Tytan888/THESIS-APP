@@ -18,7 +18,6 @@ import 'package:karaoke_app/import.dart';
 const String appTitle = "Koe.ru";
 
 String currentUsername = "";
-const int dailyRequestLimit = 5;
 
 const String g1 = "aoi";
 const String g2 = "aka";

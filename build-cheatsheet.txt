@@ -5,6 +5,6 @@ flutter build appbundle --release
 flutter build web --base-href "/koeru-web/"
 
 git init
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+git remote add origin https://github.com/TyTan888/koeru-web.git
 git fetch origin
 git reset --mixed origin/main

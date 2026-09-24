@@ -401,6 +401,12 @@ class _SearchScreenState extends State<SearchScreen> {
       final Map<String, dynamic> dailyRequests = Map<String, dynamic>.from(userData['daily_requests'] ?? {});
       final int requestsToday = dailyRequests[todayKey] ?? 0;
 
+      final limitRef = db.collection("config").doc("daily_requests");
+      final limitSnapshot = await limitRef.get();
+      final limitData = limitSnapshot.data() ?? {};
+
+      final dailyRequestLimit = (limitData["max"] as num?)?.toInt() ?? 10;
+
       if (requestsToday >= dailyRequestLimit) {
         if (!mounted) return;
 

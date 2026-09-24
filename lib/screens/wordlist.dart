@@ -230,6 +230,17 @@ class _WordlistScreenState extends State<WordlistScreen>
       final groupId = currentUsername.split('_').first;
 
       if (groupId == g1) {
+        final playlistSongRef = FirebaseFirestore.instance
+            .collection("users")
+            .doc(currentUsername)
+            .collection("playlist")
+            .doc(widget.videoId);
+
+        await playlistSongRef.set({
+          'last_sung_date': DateTime.now(),
+          'times_sung': FieldValue.increment(1),
+        }, SetOptions(merge: true));
+
         await checkAndNavigatePostTest(
           context,
           widget.videoId,
@@ -678,7 +689,7 @@ class _WordlistScreenState extends State<WordlistScreen>
                                 );
                               },
                         child: Text(
-                          isLastWord ? "Start Karaoke!" : "Next Word",
+                          isLastWord ? "Finish!" : "Next Word",
                           style: const TextStyle(
                             fontSize: 18,
                             color: Colors.white,
