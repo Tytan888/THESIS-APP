@@ -10,6 +10,7 @@ class ImmediatePostTestScreen extends StatefulWidget {
   final String sessionId;
   final List<Map<String, dynamic>> unseenWords;
   final int recoveredIndex;
+  final bool fromPlaylist;
 
   const ImmediatePostTestScreen({
     super.key,
@@ -17,10 +18,12 @@ class ImmediatePostTestScreen extends StatefulWidget {
     required this.sessionId,
     required this.unseenWords,
     this.recoveredIndex = 0,
+    required this.fromPlaylist,
   });
 
   @override
-  State<ImmediatePostTestScreen> createState() => _ImmediatePostTestScreenState();
+  State<ImmediatePostTestScreen> createState() =>
+      _ImmediatePostTestScreenState();
 }
 
 class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
@@ -79,7 +82,9 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      _accumulatedMs += DateTime.now().difference(_segmentStartTime).inMilliseconds;
+      _accumulatedMs += DateTime.now()
+          .difference(_segmentStartTime)
+          .inMilliseconds;
       _segmentStartTime = DateTime.now();
       _saveSessionState();
     } else if (state == AppLifecycleState.resumed) {
@@ -89,17 +94,25 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
 
   Future<void> _saveSessionState() async {
     final prefs = await SharedPreferences.getInstance();
+    if (_isSaving) return;
+    
     await prefs.setString('active_session_type', 'immediate_post');
     await prefs.setString('active_video_id', widget.videoId);
     await prefs.setString('active_session_id', widget.sessionId);
     await prefs.setInt('active_current_index', _currentIndex);
-    await prefs.setString('active_unseen_words', jsonEncode(widget.unseenWords));
+    await prefs.setString(
+      'active_unseen_words',
+      jsonEncode(widget.unseenWords),
+    );
     await prefs.setString('active_test_results', jsonEncode(_testResults));
     await prefs.setInt('active_accumulated_ms', _accumulatedMs);
+    await prefs.setBool('from_playlist', widget.fromPlaylist);
   }
 
   Future<void> _handleNext({required bool recognized}) async {
-    final currentSegmentMs = DateTime.now().difference(_segmentStartTime).inMilliseconds;
+    final currentSegmentMs = DateTime.now()
+        .difference(_segmentStartTime)
+        .inMilliseconds;
     final totalElapsedMs = _accumulatedMs + currentSegmentMs;
     final currentWord = widget.unseenWords[_currentIndex];
     final answer = _answerController.text.trim();
@@ -152,10 +165,13 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
     await prefs.remove('active_unseen_words');
     await prefs.remove('active_test_results');
     await prefs.remove('active_accumulated_ms');
+    await prefs.remove('from_playlist');
 
     try {
       final batch = FirebaseFirestore.instance.batch();
-      final userDocRef = FirebaseFirestore.instance.collection('users').doc(currentUsername);
+      final userDocRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUsername);
       final wordlistRef = userDocRef.collection('wordlist');
 
       // 1. Save the new test fields to the wordlist documents
@@ -179,12 +195,14 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
           final endDate = (test['end_date'] as Timestamp).toDate();
           final telemetryId = test['telemetry_id'] as String? ?? "";
 
-          if (now.isAfter(startDate) && now.isBefore(endDate) && telemetryId.isEmpty) {
+          if (now.isAfter(startDate) &&
+              now.isBefore(endDate) &&
+              telemetryId.isEmpty) {
             weeklyTests[i]['telemetry_id'] = widget.sessionId;
             break; // Update only the active one
           }
         }
-        
+
         // Push the modified array back to the user document
         batch.update(userDocRef, {'weekly_post_test': weeklyTests});
       }
@@ -193,19 +211,25 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
 
       if (!mounted) return;
 
-      // Finish the session and return to StudyScreen
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const StudyScreen()),
-        (route) => route.isFirst,
-      );
+      if (!widget.fromPlaylist) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const StudyScreen()),
+          (route) => route.isFirst,
+        );
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const PlaylistScreen()),
+          (route) => route.isFirst,
+        );
+      }
     } catch (e) {
       setState(() => _isSaving = false);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error saving: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error saving: $e")));
     }
   }
 
@@ -214,7 +238,9 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
     List<String> cleanForms = [];
     for (var form in rawForms) {
       final infoList = form['info'] as List<dynamic>? ?? [];
-      if (infoList.every((info) => info.toString().toLowerCase().contains('ateji'))) {
+      if (infoList.every(
+        (info) => info.toString().toLowerCase().contains('ateji'),
+      )) {
         cleanForms.add(form['text'].toString());
       }
     }
@@ -254,14 +280,26 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
     List<String> validReadings = bestReadings.values.toList();
 
     final bool hasKanji = validWritings.isNotEmpty;
-    final primaryMain = hasKanji ? validWritings.first : (validReadings.isNotEmpty ? validReadings.first : "???");
-    final primarySub = hasKanji && validReadings.isNotEmpty ? validReadings.first : "";
+    final primaryMain = hasKanji
+        ? validWritings.first
+        : (validReadings.isNotEmpty ? validReadings.first : "???");
+    final primarySub = hasKanji && validReadings.isNotEmpty
+        ? validReadings.first
+        : "";
 
-    final secondaryMains = hasKanji && validWritings.length > 1 ? validWritings.sublist(1).join(', ') : "";
-    final secondarySubs = validReadings.length > 1 ? validReadings.sublist(1).join(', ') : "";
+    final secondaryMains = hasKanji && validWritings.length > 1
+        ? validWritings.sublist(1).join(', ')
+        : "";
+    final secondarySubs = validReadings.length > 1
+        ? validReadings.sublist(1).join(', ')
+        : "";
 
-    final primaryRomaji = primarySub.isNotEmpty ? kanaToRomaji(primarySub) : kanaToRomaji(primaryMain);
-    final secondaryRomaji = secondarySubs.isNotEmpty ? validReadings.sublist(1).map((r) => kanaToRomaji(r)).join(', ') : "";
+    final primaryRomaji = primarySub.isNotEmpty
+        ? kanaToRomaji(primarySub)
+        : kanaToRomaji(primaryMain);
+    final secondaryRomaji = secondarySubs.isNotEmpty
+        ? validReadings.sublist(1).map((r) => kanaToRomaji(r)).join(', ')
+        : "";
 
     return PopScope(
       canPop: false,
@@ -269,7 +307,9 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
         if (didPop) return;
         final now = DateTime.now();
         final maxDuration = const Duration(seconds: 2);
-        final isWarning = _lastBackedAt == null || now.difference(_lastBackedAt!) > maxDuration;
+        final isWarning =
+            _lastBackedAt == null ||
+            now.difference(_lastBackedAt!) > maxDuration;
         if (isWarning) {
           _lastBackedAt = now;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -284,7 +324,9 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text("Quick After-Review (${_currentIndex + 1} / ${widget.unseenWords.length})"),
+          title: Text(
+            "Quick After-Review (${_currentIndex + 1} / ${widget.unseenWords.length})",
+          ),
           leading: _currentIndex > 0
               ? IconButton(
                   icon: const Icon(Icons.arrow_back),
@@ -379,7 +421,9 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 16,
-                                color: Colors.greenAccent.withValues(alpha: 0.8),
+                                color: Colors.greenAccent.withValues(
+                                  alpha: 0.8,
+                                ),
                               ),
                             ),
                         ],
@@ -411,22 +455,30 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ).copyWith(
-                      side: WidgetStateProperty.resolveWith((states) {
-                        if (states.contains(WidgetState.disabled)) return const BorderSide(color: Colors.grey);
-                        return const BorderSide(color: Colors.blueAccent);
-                      }),
-                      foregroundColor: WidgetStateProperty.resolveWith((states) {
-                        if (states.contains(WidgetState.disabled)) return Colors.grey;
-                        return Colors.blueAccent;
-                      }),
-                      backgroundColor: WidgetStateProperty.resolveWith((states) {
-                        if (states.contains(WidgetState.disabled)) return Colors.grey.shade200;
-                        return Colors.transparent;
-                      }),
-                    ),
+                    style:
+                        OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ).copyWith(
+                          side: WidgetStateProperty.resolveWith((states) {
+                            if (states.contains(WidgetState.disabled))
+                              return const BorderSide(color: Colors.grey);
+                            return const BorderSide(color: Colors.blueAccent);
+                          }),
+                          foregroundColor: WidgetStateProperty.resolveWith((
+                            states,
+                          ) {
+                            if (states.contains(WidgetState.disabled))
+                              return Colors.grey;
+                            return Colors.blueAccent;
+                          }),
+                          backgroundColor: WidgetStateProperty.resolveWith((
+                            states,
+                          ) {
+                            if (states.contains(WidgetState.disabled))
+                              return Colors.grey.shade200;
+                            return Colors.transparent;
+                          }),
+                        ),
                     onPressed: _answerController.text.trim().isEmpty
                         ? () => _handleNext(recognized: false)
                         : null,

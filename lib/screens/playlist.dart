@@ -4,7 +4,7 @@ import 'package:karaoke_app/import.dart';
 
 class _PlaylistSongTile extends StatelessWidget {
   final String videoId;
-  
+
   const _PlaylistSongTile({required this.videoId});
 
   Widget _buildStatusIcon(String status, int stage) {
@@ -17,12 +17,16 @@ class _PlaylistSongTile extends StatelessWidget {
           width: 24,
           height: 24,
           child: CircularProgressIndicator(
-            strokeWidth: 2, 
+            strokeWidth: 2,
             value: progressValue,
           ),
         );
       case 'error':
-        return const Icon(Icons.error_outline, color: Colors.redAccent, size: 30);
+        return const Icon(
+          Icons.error_outline,
+          color: Colors.redAccent,
+          size: 30,
+        );
       default:
         return const Icon(Icons.hourglass_empty, color: Colors.grey);
     }
@@ -31,11 +35,18 @@ class _PlaylistSongTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection("songs").doc(videoId).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection("songs")
+          .doc(videoId)
+          .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const ListTile(
-            leading: SizedBox(width: 120, height: 68, child: Center(child: CircularProgressIndicator())),
+            leading: SizedBox(
+              width: 120,
+              height: 68,
+              child: Center(child: CircularProgressIndicator()),
+            ),
             title: Text("Loading..."),
           );
         }
@@ -45,7 +56,8 @@ class _PlaylistSongTile extends StatelessWidget {
         final status = songData['status'] ?? '';
         final title = songData['title'] ?? 'Deleted Song';
         final artist = songData['artist'] ?? '???';
-        final thumbnailUrl = "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
+        final thumbnailUrl =
+            "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
 
         // IF PROCESSING: Nest a stream to listen to the subcollection progress document
         if (status == 'processing') {
@@ -61,30 +73,68 @@ class _PlaylistSongTile extends StatelessWidget {
               String msg = "Processing...";
 
               if (progressSnapshot.hasData && progressSnapshot.data!.exists) {
-                final progressData = progressSnapshot.data!.data() as Map<String, dynamic>? ?? {};
+                final progressData =
+                    progressSnapshot.data!.data() as Map<String, dynamic>? ??
+                    {};
                 stage = progressData['processing_stage'] ?? 0;
                 msg = progressData['processing_msg'] ?? msg;
               }
 
-              return _buildTileLayout(context, title, artist, thumbnailUrl, status, stage, msg);
+              return _buildTileLayout(
+                context,
+                title,
+                artist,
+                thumbnailUrl,
+                status,
+                stage,
+                msg,
+              );
             },
           );
         }
 
-        final msg = status == 'error' ? (errorMessages[songData['error_code'] ?? 'ERR_DEFAULT'] ?? 'An unexpected issue occurred. Please contact the developers.') : '';
-        return _buildTileLayout(context, title, artist, thumbnailUrl, status, 0, msg);
+        final msg = status == 'error'
+            ? (errorMessages[songData['error_code'] ?? 'ERR_DEFAULT'] ??
+                  'An unexpected issue occurred. Please contact the developers.')
+            : '';
+        return _buildTileLayout(
+          context,
+          title,
+          artist,
+          thumbnailUrl,
+          status,
+          0,
+          msg,
+        );
       },
     );
   }
 
   // Extracted the UI layout into a helper method to keep code clean and avoid duplication
-  Widget _buildTileLayout(BuildContext context, String title, String artist, String thumbnailUrl, String status, int stage, String msg) {
+  Widget _buildTileLayout(
+    BuildContext context,
+    String title,
+    String artist,
+    String thumbnailUrl,
+    String status,
+    int stage,
+    String msg,
+  ) {
     return ListTile(
-      leading: thumbnailUrl.isNotEmpty 
-          ? Image.network(thumbnailUrl, width: 100, height: 68, fit: BoxFit.cover)
-          : const SizedBox(width: 120, height: 68, child: Icon(Icons.music_note)),
+      leading: thumbnailUrl.isNotEmpty
+          ? Image.network(
+              thumbnailUrl,
+              width: 100,
+              height: 68,
+              fit: BoxFit.cover,
+            )
+          : const SizedBox(
+              width: 120,
+              height: 68,
+              child: Icon(Icons.music_note),
+            ),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      
+
       // 1. Always show the artist, remove the dynamic color/bold styling
       subtitle: Text(
         artist,
@@ -96,8 +146,8 @@ class _PlaylistSongTile extends StatelessWidget {
         ),
       ),
       trailing: _buildStatusIcon(status, stage),
-      
-      onTap: () {
+
+      onTap: () async {
         if (status == 'processing') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -111,18 +161,41 @@ class _PlaylistSongTile extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                msg.isNotEmpty ? msg : "Processing for \"$title\" encountered an issue...",
+                msg.isNotEmpty
+                    ? msg
+                    : "Processing for \"$title\" encountered an issue...",
               ),
               duration: const Duration(milliseconds: 1500),
             ),
           );
         } else if (status == 'completed') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text("Start Study Session?"),
               content: Text(
-                msg.isNotEmpty ? msg : "\"$title\" is in your playlist!",
+                "Start a study session with \"$title\"?",
               ),
-              duration: const Duration(milliseconds: 1500),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text("Start"),
+                ),
+              ],
+            ),
+          );
+
+          if (confirmed != true || !context.mounted) return;
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  PreFlightScreen(videoId: videoId, fromPlaylist: true),
             ),
           );
         }
@@ -137,9 +210,7 @@ class PlaylistScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Your Playlist"),
-      ),
+      appBar: AppBar(title: const Text("Your Playlist")),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
@@ -147,28 +218,30 @@ class PlaylistScreen extends StatelessWidget {
             .collection('playlist')
             .orderBy('date_added', descending: true)
             .snapshots(),
-          builder: (context, snapshot) {
-            if(snapshot.connectionState == ConnectionState.waiting){
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError){
-              return Center(child: Text("Error: ${snapshot.error}"));
-            }
-            if(!snapshot.hasData || snapshot.data!.docs.isEmpty){
-              return const Center(child: Text("Your playlist is empty. Go add some songs!"));
-            }
-
-            final playlistDocs = snapshot.data!.docs;
-
-            return ListView.builder(
-              itemCount: playlistDocs.length,
-              itemBuilder: (context, index) {
-                final videoId = playlistDocs[index].id;
-                return _PlaylistSongTile(videoId: videoId);
-              },
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text("Your playlist is empty. Go add some songs!"),
             );
           }
-      )
+
+          final playlistDocs = snapshot.data!.docs;
+
+          return ListView.builder(
+            itemCount: playlistDocs.length,
+            itemBuilder: (context, index) {
+              final videoId = playlistDocs[index].id;
+              return _PlaylistSongTile(videoId: videoId);
+            },
+          );
+        },
+      ),
     );
   }
 }

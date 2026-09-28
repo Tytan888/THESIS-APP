@@ -10,6 +10,7 @@ class PreTestScreen extends StatefulWidget {
   final List<Map<String, dynamic>> unseenWords;
   final List<Map<String, dynamic>> allWords;
   final int recoveredIndex;
+  final bool fromPlaylist;
 
   const PreTestScreen({
     super.key,
@@ -17,6 +18,7 @@ class PreTestScreen extends StatefulWidget {
     required this.unseenWords,
     required this.allWords,
     this.recoveredIndex = 0,
+    required this.fromPlaylist,
   });
 
   @override
@@ -92,6 +94,8 @@ class _PreTestScreenState extends State<PreTestScreen>
 
   Future<void> _saveSessionState() async {
     final prefs = await SharedPreferences.getInstance();
+    if (_isSaving) return;
+    
     await prefs.setString('active_session_type', 'pre_test');
     await prefs.setString('active_video_id', widget.videoId);
     await prefs.setInt('active_current_index', _currentIndex);
@@ -102,6 +106,7 @@ class _PreTestScreenState extends State<PreTestScreen>
     await prefs.setString('active_all_words', jsonEncode(widget.allWords));
     await prefs.setString('active_test_results', jsonEncode(_testResults));
     await prefs.setInt('active_accumulated_ms', _accumulatedMs);
+    await prefs.setBool('from_playlist', widget.fromPlaylist);
   }
 
   Future<void> _handleNext({required bool recognized}) async {
@@ -159,6 +164,7 @@ class _PreTestScreenState extends State<PreTestScreen>
     await prefs.remove('active_all_words');
     await prefs.remove('active_test_results');
     await prefs.remove('active_accumulated_ms');
+    await prefs.remove('from_playlist');
 
     try {
       final batch = FirebaseFirestore.instance.batch();
@@ -185,6 +191,7 @@ class _PreTestScreenState extends State<PreTestScreen>
             videoId: widget.videoId,
             allWords: widget.allWords,
             unseenWords: widget.unseenWords,
+            fromPlaylist: widget.fromPlaylist,
           ),
         ),
       );
@@ -205,7 +212,9 @@ class _PreTestScreenState extends State<PreTestScreen>
     List<String> cleanForms = [];
     for (var form in rawForms) {
       final infoList = form['info'] as List<dynamic>? ?? [];
-      if (infoList.every((info) => info.toString().toLowerCase().contains('ateji'))) {
+      if (infoList.every(
+        (info) => info.toString().toLowerCase().contains('ateji'),
+      )) {
         cleanForms.add(form['text'].toString());
       }
     }

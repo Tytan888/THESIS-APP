@@ -1,3 +1,4 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "cmake.sourceDirectory": "C:/Users/Tyra/Documents/Activi.ty/Acads/University/Year 5/THESIS/Flutter/karaoke_app/linux"
 }

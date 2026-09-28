@@ -11,6 +11,7 @@ class WordlistScreen extends StatefulWidget {
   final List<Map<String, dynamic>> allWords;
   final List<Map<String, dynamic>> unseenWords;
   final int recoveredIndex;
+  final bool fromPlaylist;
 
   const WordlistScreen({
     super.key,
@@ -18,6 +19,7 @@ class WordlistScreen extends StatefulWidget {
     required this.allWords,
     required this.unseenWords,
     this.recoveredIndex = 0,
+    required this.fromPlaylist,
   });
 
   @override
@@ -35,10 +37,12 @@ class _WordlistScreenState extends State<WordlistScreen>
 
   bool _isSaving = false;
   bool _isLoadingMemory = true;
-  bool _isLoadingSubtitles = true; // NEW: Track subtitle loading
+  bool _isLoadingSubtitles = true;
   DateTime? _lastBackedAt;
 
-  List<SubtitleLine> _subtitles = []; // NEW: Store the fetched lyrics
+  List<SubtitleLine> _subtitles = [];
+  String _songTitle = '';
+  String _songArtist = '';
 
   @override
   void initState() {
@@ -67,6 +71,8 @@ class _WordlistScreenState extends State<WordlistScreen>
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
+        final songTitle = data['title']?.toString().trim() ?? '';
+        final songArtist = data['artist']?.toString().trim() ?? '';
         final rawSubs = data['subtitles'] as List<dynamic>? ?? [];
 
         List<SubtitleLine> parsedSubs = rawSubs.map((s) {
@@ -90,9 +96,13 @@ class _WordlistScreenState extends State<WordlistScreen>
         if (mounted) {
           setState(() {
             _subtitles = parsedSubs;
+            _songTitle = songTitle;
+            _songArtist = songArtist;
             _isLoadingSubtitles = false;
           });
         }
+      } else {
+        if (mounted) setState(() => _isLoadingSubtitles = false);
       }
     } catch (e) {
       debugPrint("Error fetching subtitles: $e");
@@ -145,6 +155,8 @@ class _WordlistScreenState extends State<WordlistScreen>
 
   Future<void> _saveSessionState() async {
     final prefs = await SharedPreferences.getInstance();
+    if (_isSaving) return;
+
     await prefs.setString('active_session_type', 'wordlist');
     await prefs.setString('active_video_id', widget.videoId);
     await prefs.setInt('active_current_index', _currentIndex);
@@ -157,6 +169,7 @@ class _WordlistScreenState extends State<WordlistScreen>
       'active_dwell_times',
       jsonEncode(_cumulativeDwellTimeMs),
     );
+    await prefs.setBool('from_playlist', widget.fromPlaylist);
   }
 
   List<String> _getCleanForms(List<dynamic> rawForms) {
@@ -195,6 +208,7 @@ class _WordlistScreenState extends State<WordlistScreen>
       await prefs.remove('active_all_words');
       await prefs.remove('active_unseen_words');
       await prefs.remove('active_dwell_times');
+      await prefs.remove('from_playlist');
 
       final telemetryRef = FirebaseFirestore.instance
           .collection("users")
@@ -246,6 +260,7 @@ class _WordlistScreenState extends State<WordlistScreen>
           widget.videoId,
           sessionId,
           widget.unseenWords,
+          widget.fromPlaylist,
         );
       } else {
         Navigator.pushReplacement(
@@ -258,6 +273,7 @@ class _WordlistScreenState extends State<WordlistScreen>
                   .toList(),
               sessionId: sessionId,
               unseenWords: widget.unseenWords,
+              fromPlaylist: widget.fromPlaylist,
             ),
           ),
         );
@@ -627,10 +643,60 @@ class _WordlistScreenState extends State<WordlistScreen>
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                          if (_songTitle.isNotEmpty ||
+                              _songArtist.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Icon(
+                                    Icons.music_note,
+                                    size: 16,
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (_songTitle.isNotEmpty)
+                                        Text(
+                                          _songTitle,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.85,
+                                            ),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      if (_songArtist.isNotEmpty)
+                                        Text(
+                                          _songArtist,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.5,
+                                            ),
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 12),
                           Container(
-                            width: double.infinity, // Let it fill horizontally
-                            // REMOVE THE fixed height completely so it hugs the text!
+                            width: double.infinity,
                             padding: const EdgeInsets.all(16.0),
                             decoration: BoxDecoration(
                               color: const Color(0xFF1E1E1E),

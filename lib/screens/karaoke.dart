@@ -13,6 +13,7 @@ class KaraokePlayerScreen extends StatefulWidget {
   final List<String> reviewedUids;
   final String sessionId;
   final List<Map<String, dynamic>> unseenWords;
+  final bool fromPlaylist;
 
   const KaraokePlayerScreen({
     super.key,
@@ -20,6 +21,7 @@ class KaraokePlayerScreen extends StatefulWidget {
     required this.reviewedUids,
     required this.sessionId,
     required this.unseenWords,
+    required this.fromPlaylist,
   });
 
   @override
@@ -83,6 +85,9 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
       }
 
       if (event.hasError) {
+        if (_isFinishing) return;
+        _isFinishing = true;
+
         debugPrint("YouTube Player Error: ${event.error}");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -100,6 +105,8 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
             prefs.remove('active_session_id');
             prefs.remove('active_reviewed_uids');
             prefs.remove('active_karaoke_dwell_time');
+            prefs.remove('from_playlist');
+            prefs.remove('active_unseen_words');
           });
 
           await checkAndNavigatePostTest(
@@ -107,6 +114,7 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
             widget.videoId,
             widget.sessionId,
             widget.unseenWords,
+            widget.fromPlaylist,
           );
         }
       }
@@ -149,8 +157,12 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
     }
   }
 
+  bool _isFinishing = false;
+
   Future<void> _saveSessionState() async {
     final prefs = await SharedPreferences.getInstance();
+    if (_isFinishing) return;
+
     await prefs.setString('active_session_type', 'karaoke');
     await prefs.setString('active_video_id', widget.videoId);
     await prefs.setString('active_session_id', widget.sessionId);
@@ -163,6 +175,7 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
       jsonEncode(widget.unseenWords),
     );
     await prefs.setInt('active_karaoke_dwell_time', accumulatedMs);
+    await prefs.setBool('from_playlist', widget.fromPlaylist);
   }
 
   Future<void> _fetchSubtitlesFromDatabase() async {
@@ -371,6 +384,9 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
                   child: ElevatedButton(
                     onPressed: _isVideoFinished
                         ? () async {
+                            if (_isFinishing) return;
+                            _isFinishing = true;
+
                             final batch = FirebaseFirestore.instance.batch();
 
                             accumulatedMs += DateTime.now()
@@ -383,6 +399,7 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
                             await prefs.remove('active_session_id');
                             await prefs.remove('active_reviewed_uids');
                             await prefs.remove('active_unseen_words');
+                            await prefs.remove('from_playlist');
 
                             final telemetryRef = FirebaseFirestore.instance
                                 .collection("users")
@@ -425,6 +442,7 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
                               widget.videoId,
                               widget.sessionId,
                               widget.unseenWords,
+                              widget.fromPlaylist,
                             );
                           }
                         : null,
@@ -956,10 +974,7 @@ class _ShrinkToFitLyricsState extends State<_ShrinkToFitLyrics> {
           // widget.maxHeight by the SizedBox above (which was the bug —
           // it made `fits` always true and disabled shrinking entirely).
           maxHeight: double.infinity,
-          child: KeyedSubtree(
-            key: _measureKey,
-            child: widget.builder(_scale),
-          ),
+          child: KeyedSubtree(key: _measureKey, child: widget.builder(_scale)),
         ),
       ),
     );

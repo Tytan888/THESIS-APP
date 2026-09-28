@@ -10,27 +10,27 @@ class StudyScreen extends StatefulWidget {
 }
 
 class _StudyScreenState extends State<StudyScreen> {
-  
   // Helper function to find exactly 5 completed songs based on the sorted playlist order
   Future<List<String>> _getTop5CompletedSongs(List<String> sortedIds) async {
     List<String> validSongs = [];
-    
+
     // Firestore 'whereIn' queries only support up to 10 items at a time
     for (int i = 0; i < sortedIds.length; i += 10) {
       int end = (i + 10 < sortedIds.length) ? i + 10 : sortedIds.length;
       List<String> chunk = sortedIds.sublist(i, end);
-      
+
       final snapshot = await FirebaseFirestore.instance
           .collection('songs')
           .where(FieldPath.documentId, whereIn: chunk)
           .get();
-          
+
       // Create a map to easily check the status of the songs we just fetched
       final chunkData = {for (var doc in snapshot.docs) doc.id: doc.data()};
-      
+
       // Iterate in the original SORTED order to maintain your recommendation logic
       for (String id in chunk) {
-        if (chunkData.containsKey(id) && chunkData[id]!['status'] == 'completed') {
+        if (chunkData.containsKey(id) &&
+            chunkData[id]!['status'] == 'completed') {
           validSongs.add(id);
           // Stop immediately once we have exactly 5!
           if (validSongs.length == 5) return validSongs;
@@ -69,7 +69,7 @@ class _StudyScreenState extends State<StudyScreen> {
               },
               icon: const Icon(Icons.search),
               label: const Text("Find Songs"),
-            )
+            ),
           ],
         ),
       ),
@@ -79,25 +79,28 @@ class _StudyScreenState extends State<StudyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Study Hub"),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text("Study Hub"), centerTitle: true),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection("users").doc(currentUsername).collection("playlist").snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .doc(currentUsername)
+            .collection("playlist")
+            .snapshots(),
         builder: (context, playlistSnapshot) {
-          if (playlistSnapshot.connectionState == ConnectionState.waiting){
+          if (playlistSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (playlistSnapshot.hasError){
+          if (playlistSnapshot.hasError) {
             return Center(child: Text("Error: ${playlistSnapshot.error}"));
           }
-          if(!playlistSnapshot.hasData || playlistSnapshot.data!.docs.isEmpty){
+          if (!playlistSnapshot.hasData ||
+              playlistSnapshot.data!.docs.isEmpty) {
             return _buildEmptyState(context);
           }
 
           // 1. Sort the playlist exactly as you were doing before
-          List<QueryDocumentSnapshot> playlist = playlistSnapshot.data!.docs.toList();
+          List<QueryDocumentSnapshot> playlist = playlistSnapshot.data!.docs
+              .toList();
           playlist.sort((a, b) {
             final dataA = a.data() as Map<String, dynamic>;
             final dataB = b.data() as Map<String, dynamic>;
@@ -111,8 +114,8 @@ class _StudyScreenState extends State<StudyScreen> {
               return addedA.compareTo(addedB);
             }
 
-            if(lastSungA == null) return -1;
-            if(lastSungB == null) return 1;
+            if (lastSungA == null) return -1;
+            if (lastSungB == null) return 1;
 
             return lastSungA.compareTo(lastSungB);
           });
@@ -124,16 +127,19 @@ class _StudyScreenState extends State<StudyScreen> {
           return FutureBuilder<List<String>>(
             future: _getTop5CompletedSongs(sortedIds),
             builder: (context, completedSongsSnapshot) {
-              if (completedSongsSnapshot.connectionState == ConnectionState.waiting) {
+              if (completedSongsSnapshot.connectionState ==
+                  ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
 
               final validVideoIds = completedSongsSnapshot.data ?? [];
 
               if (validVideoIds.isEmpty) {
-                 return const Center(
-                   child: Text("All your songs are still processing! Check back soon."),
-                 );
+                return const Center(
+                  child: Text(
+                    "All your songs are still processing! Check back soon.",
+                  ),
+                );
               }
 
               return Padding(
@@ -143,7 +149,10 @@ class _StudyScreenState extends State<StudyScreen> {
                   children: [
                     const Text(
                       "Recommended for Review",
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -161,12 +170,12 @@ class _StudyScreenState extends State<StudyScreen> {
                       ),
                     ),
                   ],
-                )
+                ),
               );
-            }
+            },
           );
         },
-      )
+      ),
     );
   }
 }
@@ -179,18 +188,23 @@ class _StudySongTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('songs').doc(videoId).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('songs')
+          .doc(videoId)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox();
+        if (!snapshot.hasData || !snapshot.data!.exists)
+          return const SizedBox();
 
         final data = snapshot.data!.data() as Map<String, dynamic>;
-        
+
         // Only show completed songs in the study hub
         if (data['status'] != 'completed') return const SizedBox();
 
         final String title = data['title'] ?? 'Unknown Title';
         final String artist = data['artist'] ?? 'Unknown Artist';
-        final String thumbnailUrl = "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
+        final String thumbnailUrl =
+            "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
@@ -200,7 +214,8 @@ class _StudySongTile extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => PreFlightScreen(videoId: videoId),
+                  builder: (context) =>
+                      PreFlightScreen(videoId: videoId, fromPlaylist: false),
                 ),
               );
             },
@@ -226,12 +241,18 @@ class _StudySongTile extends StatelessWidget {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                         Text(
                           artist,
                           maxLines: 1,
-                          style: const TextStyle(color: Colors.grey, fontSize: 14),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),

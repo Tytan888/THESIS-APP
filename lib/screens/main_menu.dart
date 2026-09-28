@@ -56,6 +56,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     // Extract the base data every session needs
     final String videoId = prefs.getString('active_video_id') ?? '';
     final String sessionId = prefs.getString('active_session_id') ?? '';
+    final bool fromPlaylist = prefs.getBool('from_playlist') ?? false;
 
     if (sessionType == 'pre_test') {
       final unseenWords = List<Map<String, dynamic>>.from(
@@ -73,8 +74,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             videoId: videoId,
             unseenWords: unseenWords,
             allWords: allWords,
-            recoveredIndex:
-                startIndex, // We will add this parameter to PreTest next!
+            recoveredIndex: startIndex,
+            fromPlaylist: fromPlaylist,
           ),
         ),
       );
@@ -96,6 +97,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             recoveredIndex:
                 startIndex, // We will add this parameter to Wordlist next!
             unseenWords: unseenWords,
+            fromPlaylist: fromPlaylist,
           ),
         ),
       );
@@ -115,6 +117,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             reviewedUids: reviewedUids,
             sessionId: sessionId,
             unseenWords: unseenWords,
+            fromPlaylist: fromPlaylist,
           ),
         ),
       );
@@ -132,6 +135,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             sessionId: sessionId,
             unseenWords: unseenWords,
             recoveredIndex: startIndex,
+            fromPlaylist: fromPlaylist,
           ),
         ),
       );

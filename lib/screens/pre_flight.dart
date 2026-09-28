@@ -4,8 +4,9 @@ import 'package:karaoke_app/import.dart';
 
 class PreFlightScreen extends StatefulWidget {
   final String videoId;
+  final bool fromPlaylist;
 
-  const PreFlightScreen({super.key, required this.videoId});
+  const PreFlightScreen({super.key, required this.videoId, required this.fromPlaylist});
 
   @override
   State<PreFlightScreen> createState() => _PreFlightScreenState();
@@ -114,6 +115,7 @@ class _PreFlightScreenState extends State<PreFlightScreen> {
               videoId: widget.videoId,
               unseenWords: unseenWords,
               allWords: allWords,
+              fromPlaylist: widget.fromPlaylist
             ),
           ),
         );
@@ -125,6 +127,7 @@ class _PreFlightScreenState extends State<PreFlightScreen> {
               videoId: widget.videoId,
               allWords: allWords,
               unseenWords: const [],
+              fromPlaylist: widget.fromPlaylist
             ),
           ),
         );

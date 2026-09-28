@@ -32,56 +32,26 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
       Set<String> userSongIds = playlistSnap.docs.map((doc) => doc.id).toSet();
 
-      List<SongResult> results = [];
-      DocumentSnapshot? lastDocument;
-      bool hasMore = true;
-      const targetDisplayCount =
-          20; // The number of new songs you want to show on the screen
+      final globalSnap = await db
+          .collection('songs')
+          .where('status', isEqualTo: 'completed')
+          .get();
 
-      // 2. Loop until we find enough un-added songs, or run out of songs in the DB
-      while (results.length < targetDisplayCount && hasMore) {
-        var query = db
-            .collection('songs')
-            .where('status', isEqualTo: 'completed')
-            .limit(50);
+      final candidates =
+          globalSnap.docs.where((doc) => !userSongIds.contains(doc.id)).toList()
+            ..shuffle();
 
-        if (lastDocument != null) {
-          query = query.startAfterDocument(lastDocument!);
-        }
-
-        final globalSongsSnap = await query.get();
-
-        if (globalSongsSnap.docs.isEmpty) {
-          hasMore = false; // No more songs left in the database
-          break;
-        }
-
-        // Save the cursor for the next potential batch
-        lastDocument = globalSongsSnap.docs.last;
-
-        for (var doc in globalSongsSnap.docs) {
-          // 3. Only add the song if the user doesn't already have it
-          if (!userSongIds.contains(doc.id)) {
-            final data = doc.data();
-            results.add(
-              SongResult(
-                id: doc.id,
-                title: data['title'] ?? 'Unknown Title',
-                artist: data['artist'] ?? 'Unknown Artist',
-                duration: '',
-                thumbnailUrl:
-                    "https://img.youtube.com/vi/${doc.id}/mqdefault.jpg",
-                status: SongStatus.readyToAdd,
-              ),
-            );
-
-            // Break early if this batch fulfilled our target
-            if (results.length >= targetDisplayCount) {
-              break;
-            }
-          }
-        }
-      }
+      final results = candidates.take(50).map((doc) {
+        final data = doc.data();
+        return SongResult(
+          id: doc.id,
+          title: data['title'] ?? 'Unknown Title',
+          artist: data['artist'] ?? 'Unknown Artist',
+          duration: '',
+          thumbnailUrl: "https://img.youtube.com/vi/${doc.id}/mqdefault.jpg",
+          status: SongStatus.readyToAdd,
+        );
+      }).toList();
 
       if (mounted) {
         setState(() {
