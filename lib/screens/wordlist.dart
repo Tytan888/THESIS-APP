@@ -121,6 +121,8 @@ class _WordlistScreenState extends State<WordlistScreen>
       });
     }
 
+    await _saveSessionState();
+
     if (mounted) setState(() => _isLoadingMemory = false);
   }
 
@@ -157,7 +159,6 @@ class _WordlistScreenState extends State<WordlistScreen>
     final prefs = await SharedPreferences.getInstance();
     if (_isSaving) return;
 
-    await prefs.setString('active_session_type', 'wordlist');
     await prefs.setString('active_video_id', widget.videoId);
     await prefs.setInt('active_current_index', _currentIndex);
     await prefs.setString('active_all_words', jsonEncode(widget.allWords));
@@ -170,6 +171,9 @@ class _WordlistScreenState extends State<WordlistScreen>
       jsonEncode(_cumulativeDwellTimeMs),
     );
     await prefs.setBool('from_playlist', widget.fromPlaylist);
+
+    if (_isSaving) return;
+    await prefs.setString('active_session_type', 'wordlist');
   }
 
   List<String> _getCleanForms(List<dynamic> rawForms) {
@@ -195,6 +199,16 @@ class _WordlistScreenState extends State<WordlistScreen>
     _saveSessionState();
   }
 
+  Future<void> _clearWordlistPrefs(SharedPreferences prefs) async {
+    await prefs.remove('active_session_type');
+    await prefs.remove('active_video_id');
+    await prefs.remove('active_current_index');
+    await prefs.remove('active_all_words');
+    await prefs.remove('active_unseen_words');
+    await prefs.remove('active_dwell_times');
+    await prefs.remove('from_playlist');
+  }
+
   Future<void> _handleFinish() async {
     _bankCurrentTime();
 
@@ -202,13 +216,6 @@ class _WordlistScreenState extends State<WordlistScreen>
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('active_session_type');
-      await prefs.remove('active_video_id');
-      await prefs.remove('active_current_index');
-      await prefs.remove('active_all_words');
-      await prefs.remove('active_unseen_words');
-      await prefs.remove('active_dwell_times');
-      await prefs.remove('from_playlist');
 
       final telemetryRef = FirebaseFirestore.instance
           .collection("users")
@@ -226,24 +233,29 @@ class _WordlistScreenState extends State<WordlistScreen>
         }
       });
 
-      await telemetryRef.set({
-        'session_id': sessionId,
-        'video_id': widget.videoId,
-        'study_start_time': _studyStartTime,
-        'study_end_time': studyEndTime,
-        'karaoke_start_time': null,
-        'karaoke_end_time': null,
-        'word_dwell_times_ms': activeDwellTimes,
-        'karaoke_dwell_time_ms': null,
-        'karaoke_type': null,
-        'karaoke_aborted': null,
-      });
+      await telemetryRef
+          .set({
+            'session_id': sessionId,
+            'video_id': widget.videoId,
+            'study_start_time': _studyStartTime,
+            'study_end_time': studyEndTime,
+            'karaoke_start_time': null,
+            'karaoke_end_time': null,
+            'word_dwell_times_ms': activeDwellTimes,
+            'karaoke_dwell_time_ms': null,
+            'karaoke_type': null,
+            'karaoke_aborted': null,
+            'unseen_word_count': widget.unseenWords.length,
+          })
+          .timeout(const Duration(seconds: 10));
 
       if (!mounted) return;
 
       final groupId = currentUsername.split('_').first;
 
       if (groupId == g1) {
+        await _clearWordlistPrefs(prefs);
+
         final playlistSongRef = FirebaseFirestore.instance
             .collection("users")
             .doc(currentUsername)
@@ -263,6 +275,25 @@ class _WordlistScreenState extends State<WordlistScreen>
           widget.fromPlaylist,
         );
       } else {
+        final reviewedUids = widget.allWords
+            .map((w) => w['uid'] as String)
+            .toList();
+
+        await prefs.setString('active_session_id', sessionId);
+        await prefs.setString('active_reviewed_uids', jsonEncode(reviewedUids));
+        await prefs.setString(
+          'active_unseen_words',
+          jsonEncode(widget.unseenWords),
+        );
+        await prefs.setInt('active_karaoke_dwell_time', 0);
+        await prefs.setBool('from_playlist', widget.fromPlaylist);
+        await prefs.setString('active_video_id', widget.videoId);
+        await prefs.remove('active_current_index');
+        await prefs.remove('active_all_words');
+        await prefs.remove('active_dwell_times');
+        await prefs.setString('active_session_type', 'karaoke');
+
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(

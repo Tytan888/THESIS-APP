@@ -127,6 +127,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget _buildResultTile(SongResult song) {
     return InkWell(
       onTap: () => _handleSongAction(song),
+      onLongPress: () => showOpenOnYoutubeFlow(context, song),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Row(

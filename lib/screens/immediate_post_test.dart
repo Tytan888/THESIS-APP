@@ -65,6 +65,8 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
       });
     }
 
+    await _saveSessionState();
+
     if (mounted) {
       setState(() => _isLoadingMemory = false);
     }
@@ -95,8 +97,7 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
   Future<void> _saveSessionState() async {
     final prefs = await SharedPreferences.getInstance();
     if (_isSaving) return;
-    
-    await prefs.setString('active_session_type', 'immediate_post');
+
     await prefs.setString('active_video_id', widget.videoId);
     await prefs.setString('active_session_id', widget.sessionId);
     await prefs.setInt('active_current_index', _currentIndex);
@@ -107,6 +108,9 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
     await prefs.setString('active_test_results', jsonEncode(_testResults));
     await prefs.setInt('active_accumulated_ms', _accumulatedMs);
     await prefs.setBool('from_playlist', widget.fromPlaylist);
+
+    if (_isSaving) return;
+    await prefs.setString('active_session_type', 'immediate_post');
   }
 
   Future<void> _handleNext({required bool recognized}) async {
@@ -157,16 +161,6 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
   Future<void> _saveAndNavigate() async {
     setState(() => _isSaving = true);
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('active_session_type');
-    await prefs.remove('active_video_id');
-    await prefs.remove('active_session_id');
-    await prefs.remove('active_current_index');
-    await prefs.remove('active_unseen_words');
-    await prefs.remove('active_test_results');
-    await prefs.remove('active_accumulated_ms');
-    await prefs.remove('from_playlist');
-
     try {
       final batch = FirebaseFirestore.instance.batch();
       final userDocRef = FirebaseFirestore.instance
@@ -209,6 +203,16 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
 
       await batch.commit();
 
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('active_session_type');
+      await prefs.remove('active_video_id');
+      await prefs.remove('active_session_id');
+      await prefs.remove('active_current_index');
+      await prefs.remove('active_unseen_words');
+      await prefs.remove('active_test_results');
+      await prefs.remove('active_accumulated_ms');
+      await prefs.remove('from_playlist');
+
       if (!mounted) return;
 
       if (!widget.fromPlaylist) {
@@ -223,6 +227,7 @@ class _ImmediatePostTestScreenState extends State<ImmediatePostTestScreen>
         );
       }
     } catch (e) {
+      logClientError(widget.sessionId, 'post_test_save', e);
       setState(() => _isSaving = false);
 
       if (!mounted) return;

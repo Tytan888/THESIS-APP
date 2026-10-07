@@ -67,13 +67,28 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
       ),
     );
 
-    FirebaseFirestore.instance
+    final telemetryRef = FirebaseFirestore.instance
         .collection("users")
         .doc(currentUsername)
         .collection("telemetry")
-        .doc(widget.sessionId)
-        .update({'karaoke_start_time': DateTime.now()})
-        .catchError((e) => debugPrint("Telemetry start update failed: $e"));
+        .doc(widget.sessionId);
+
+    telemetryRef
+        .get()
+        .then((snap) {
+          final isFirstStart = snap.data()?['karaoke_start_time'] == null;
+          return telemetryRef.update({
+            if (isFirstStart) 'karaoke_start_time': DateTime.now(),
+            if (!isFirstStart)
+              'karaoke_resumed_at': FieldValue.arrayUnion([Timestamp.now()]),
+            'karaoke_type': currentUsername.split('_').first == g2
+                ? 'Regular'
+                : 'Augmented',
+          });
+        })
+        .catchError(
+          (e) => logClientError(widget.sessionId, 'karaoke_start_update', e),
+        );
 
     _controller.listen((event) async {
       if (event.playerState == PlayerState.ended && !_isVideoFinished) {
@@ -88,7 +103,22 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
         if (_isFinishing) return;
         _isFinishing = true;
 
-        debugPrint("YouTube Player Error: ${event.error}");
+        logClientError(widget.sessionId, 'player_error', event.error);
+
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUsername)
+            .collection('telemetry')
+            .doc(widget.sessionId)
+            .set({
+              'karaoke_end_time': DateTime.now(),
+              'karaoke_exit_reason': 'player_error',
+              'karaoke_dwell_time_ms':
+                  accumulatedMs +
+                  DateTime.now().difference(_segmentStartTime).inMilliseconds,
+            }, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 3))
+            .catchError((_) {});
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -136,6 +166,8 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
       accumulatedMs = savedTime;
     }
 
+    await _saveSessionState();
+
     if (mounted) setState(() => _isLoadingMemory = false);
   }
 
@@ -163,7 +195,6 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
     final prefs = await SharedPreferences.getInstance();
     if (_isFinishing) return;
 
-    await prefs.setString('active_session_type', 'karaoke');
     await prefs.setString('active_video_id', widget.videoId);
     await prefs.setString('active_session_id', widget.sessionId);
     await prefs.setString(
@@ -176,6 +207,9 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
     );
     await prefs.setInt('active_karaoke_dwell_time', accumulatedMs);
     await prefs.setBool('from_playlist', widget.fromPlaylist);
+
+    if (_isFinishing) return;
+    await prefs.setString('active_session_type', 'karaoke');
   }
 
   Future<void> _fetchSubtitlesFromDatabase() async {
@@ -387,11 +421,77 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
                             if (_isFinishing) return;
                             _isFinishing = true;
 
-                            final batch = FirebaseFirestore.instance.batch();
-
                             accumulatedMs += DateTime.now()
                                 .difference(_segmentStartTime)
                                 .inMilliseconds;
+                            _segmentStartTime =
+                                DateTime.now(); // so a retry doesn't double-count
+
+                            final telemetryRef = FirebaseFirestore.instance
+                                .collection("users")
+                                .doc(currentUsername)
+                                .collection("telemetry")
+                                .doc(widget.sessionId);
+                            final playlistSongRef = FirebaseFirestore.instance
+                                .collection("users")
+                                .doc(currentUsername)
+                                .collection("playlist")
+                                .doc(widget.videoId);
+                            final groupId = currentUsername.split('_').first;
+
+                            // 1) Research data first, on its own
+                            try {
+                              await telemetryRef
+                                  .set({
+                                    'karaoke_end_time': DateTime.now(),
+                                    'karaoke_dwell_time_ms': accumulatedMs,
+                                    'karaoke_type': groupId == g2
+                                        ? "Regular"
+                                        : "Augmented",
+                                    'karaoke_aborted': _wasAborted,
+                                    'karaoke_exit_reason': _wasAborted
+                                        ? 'manual_override'
+                                        : 'finished',
+                                  }, SetOptions(merge: true))
+                                  .timeout(const Duration(seconds: 10));
+                            } catch (e) {
+                              logClientError(
+                                widget.sessionId,
+                                'finish_telemetry',
+                                e,
+                              );
+                              _isFinishing = false;
+                              if (context.mounted) {
+                                final code = e is FirebaseException
+                                    ? e.code
+                                    : e.runtimeType.toString();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Couldn't save your session ($code). Check your connection and tap Finish again.",
+                                    ),
+                                    duration: const Duration(seconds: 6),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+
+                            // 3) Playlist bookkeeping is best-effort and can't take telemetry down with it
+                            try {
+                              await playlistSongRef
+                                  .set({
+                                    'last_sung_date': DateTime.now(),
+                                    'times_sung': FieldValue.increment(1),
+                                  }, SetOptions(merge: true))
+                                  .timeout(const Duration(seconds: 10));
+                            } catch (e) {
+                              logClientError(
+                                widget.sessionId,
+                                'finish_playlist',
+                                e,
+                              );
+                            }
 
                             final prefs = await SharedPreferences.getInstance();
                             await prefs.remove('active_session_type');
@@ -399,44 +499,10 @@ class _KaraokePlayerScreenState extends State<KaraokePlayerScreen>
                             await prefs.remove('active_session_id');
                             await prefs.remove('active_reviewed_uids');
                             await prefs.remove('active_unseen_words');
+                            await prefs.remove('active_karaoke_dwell_time');
                             await prefs.remove('from_playlist');
 
-                            final telemetryRef = FirebaseFirestore.instance
-                                .collection("users")
-                                .doc(currentUsername)
-                                .collection("telemetry")
-                                .doc(widget.sessionId);
-
-                            final playlistSongRef = FirebaseFirestore.instance
-                                .collection("users")
-                                .doc(currentUsername)
-                                .collection("playlist")
-                                .doc(widget.videoId);
-
-                            final groupId = currentUsername.split('_').first;
-
-                            batch.set(telemetryRef, {
-                              'karaoke_end_time': DateTime.now(),
-                              'karaoke_dwell_time_ms': accumulatedMs,
-                              'karaoke_type': groupId == g2
-                                  ? "Regular"
-                                  : "Augmented",
-                              'karaoke_aborted': _wasAborted,
-                            }, SetOptions(merge: true));
-
-                            batch.set(playlistSongRef, {
-                              'last_sung_date': DateTime.now(),
-                              'times_sung': FieldValue.increment(1),
-                            }, SetOptions(merge: true));
-
-                            try {
-                              await batch.commit();
-                            } catch (e) {
-                              debugPrint("Telemetry save failed: $e");
-                            }
-
                             if (!context.mounted) return;
-
                             await checkAndNavigatePostTest(
                               context,
                               widget.videoId,

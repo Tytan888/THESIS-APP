@@ -14,6 +14,7 @@ export 'screens/maintenance.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:karaoke_app/import.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const String appTitle = "Koe.ru";
 
@@ -279,6 +280,7 @@ Future<void> checkAndNavigatePostTest(
   if (unseenWords.isEmpty) {
     if (!context.mounted) return;
     _returnToOrigin(context, fromPlaylist);
+    return;
   }
 
   try {
@@ -325,8 +327,98 @@ Future<void> checkAndNavigatePostTest(
       _returnToOrigin(context, fromPlaylist);
     }
   } catch (e) {
+    logClientError(sessionId, 'post_test_check', e);
     if (!context.mounted) return;
 
     _returnToOrigin(context, fromPlaylist);
   }
+}
+
+Future<void> showOpenOnYoutubeFlow(
+  BuildContext context,
+  SongResult song,
+) async {
+  // Step 1: "Do you want to open this on YouTube?"
+  final wantsToOpen = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Open on YouTube?'),
+      content: Text('Would you like to view "${song.title}" on YouTube?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('No'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Yes'),
+        ),
+      ],
+    ),
+  );
+
+  if (wantsToOpen != true || !context.mounted) return;
+
+  // Step 2: "Are you sure you want to leave the app?"
+  // The launch happens INSIDE this button's onPressed on purpose (see note below).
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Leave the app?'),
+      content: const Text('You will be redirected to YouTube.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            _launchYoutube(context, song.id);
+          },
+          child: const Text('Open YouTube'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _launchYoutube(BuildContext context, String videoId) async {
+  final uri = Uri.https('www.youtube.com', '/watch', {'v': videoId});
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Couldn't open YouTube.")));
+  }
+}
+
+void logClientError(String sessionId, String where, Object error) {
+  debugPrint('[$where] $error');
+  if (sessionId.isEmpty || currentUsername.isEmpty) return;
+
+  final code = error is FirebaseException
+      ? error.code
+      : error is Enum
+      ? error.name
+      : error.runtimeType.toString();
+  final msg = error.toString();
+
+  FirebaseFirestore.instance
+      .collection('users')
+      .doc(currentUsername)
+      .collection('telemetry')
+      .doc(sessionId)
+      .set({
+        'client_errors': FieldValue.arrayUnion([
+          {
+            'where': where,
+            'code': code,
+            'msg': msg.length > 300 ? msg.substring(0, 300) : msg,
+            'at': Timestamp.now(),
+          },
+        ]),
+      }, SetOptions(merge: true))
+      .catchError((_) {});
 }
